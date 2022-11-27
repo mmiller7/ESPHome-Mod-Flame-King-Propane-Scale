@@ -86,9 +86,9 @@ The Modification Process:
 
      Reference diagram: "Modification Pics/Signal Tap Points.JPG"
      * Status LED to bottom of R17 near the removed U1 processor
-		 * Analog scale output reading to the corner of C5 near near the corner of the PCB
-		 * 3.3V power to P4 pin 1
-		 * Ground to P4 pin 3
+     * Analog scale output reading to the corner of C5 near near the corner of the PCB
+     * 3.3V power to P4 pin 1
+     * Ground to P4 pin 3
 
 7. Use large wire, connect the power and ground wires.  I recommend tacking them to the
    opposite side of the P4 header (the side with the switches) and running them towards the
