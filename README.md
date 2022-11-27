@@ -1,6 +1,10 @@
 # ESPHome-Mod-Flame-King-Propane-Scale
 High level reverse-engineering and modification of Flame King YSN-PS1 Bluetooth propane scale to ESPHome WiFi
 
+
+
+Overview:
+
 This project started because I wanted a propane tank scale so I could track (and remind me to refill)
 the propane tank running our gas fireplace.  This was made harder because I use 40lb tanks and many
 scales only support 20lb tanks.
@@ -51,6 +55,34 @@ is not near a mains outlet (remember, propane you want away from sources of igni
 away from the house to the extent practical for safety).
 
 
+
+Files:
+Board Pics - Front/Back scaled to identical size and flpped to match positionally.  You can
+display both files in a photo-viewer and "toggle" between them to follow traces between the
+sides on your computer monitor easily.
+* back_scaled.jpg
+* back_scaled-nochip-composite.jpg
+* front_scaled-flipped-composite.jpg
+
+Board Pics - Original unmodified board, and close-up of microprocessor
+* microprocessor_closeup.jpg
+* original_board.jpg
+
+Example YAML file
+* example ESPHome - fireplace_propane.yaml
+
+Modification Pics - installation in housing
+* Capacitor Added.jpg
+* ESP8266 Connected.JPG
+* ESP8266 Fit in scale.JPG
+
+Modification Pics - Wiring Reference
+* (ppt slide 1) Load Cell Original Wiring.JPG
+* (ppt slide 2) Signal Tap Points.JPG
+* wiring.pptx
+
+
+
 Recommended Modification Tools/Supplies:
 
 * Tweasers
@@ -60,6 +92,7 @@ Recommended Modification Tools/Supplies:
 * Wire (~22 AWG) for connecting large capacitor
 * ESP8266 module (suggest D1 Mini)
 * Large value capacitor rated 5V or higher (junk bin, big one that fits - mine was 2200uF 25V)
+
 
 
 The Modification Process:
