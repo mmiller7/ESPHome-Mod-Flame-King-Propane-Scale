@@ -1,0 +1,159 @@
+# Home Assistant interfacing for propane tank scale operation
+
+# Selection for size of tank
+input_select:
+  fireplace_propane_tank_size:
+    name: Fireplace Propane Tank Size
+    options:
+      - 20lb Tank
+      - 40lb Tank
+    initial: 40lb Tank
+    icon: mdi:propane-tank-outline
+
+# scale zero offset for calibration
+input_number:
+  fireplace_propane_scale_zero_offset:
+    name: Fireplace Propane Scale Zero Offset
+    min: -9
+    max: 9
+    step: 0.1
+    unit_of_measurement: "lb" 
+
+
+template:
+  
+  - sensor:
+
+      # Sensor for scale zero weight offset
+      - name: "Fireplace Propane Weight Corrected"
+        unit_of_measurement: "lb"
+        icon: "mdi:scale"
+        device_class: "weight"
+        state_class: "measurement"
+        state: >
+          {{ states('sensor.fireplace_propane_weight') | float(default="unknown") - states('input_number.fireplace_propane_scale_zero_offset') | float(default="unknown") }}
+
+      # Sensor for tank empty weight
+      - name: "Fireplace Propane Tank Empty Weight"
+        unit_of_measurement: "lb"
+        icon: "mdi:weight-pound"
+        device_class: "weight"
+        state_class: "measurement"
+        state: >-
+          {% if states('input_select.fireplace_propane_tank_size') == "20lb Tank" %}
+          {# My actual tanks TW: 17.7, 18 #}
+            18
+          {% elif states('input_select.fireplace_propane_tank_size') == "40lb Tank" %}
+          {# My actual tanks TW: 29.9, 31.3 #}
+            31
+          {% else %}
+            unknown
+          {% endif %}
+
+      # Sensor for tank capacity
+      - name: "Fireplace Propane Tank Fuel Capacity"
+        unit_of_measurement: "lb"
+        icon: "mdi:weight-pound"
+        device_class: "weight"
+        state_class: "measurement"
+        state: >-
+          {% if states('input_select.fireplace_propane_tank_size') == "20lb Tank" %}
+            20
+          {% elif states('input_select.fireplace_propane_tank_size') == "40lb Tank" %}
+            40
+          {% else %}
+            unknown
+          {% endif %}
+
+      # Sensor for remaining fuel lb
+      - name: "Fireplace Propane Fuel Remaining"
+        unit_of_measurement: "lb"
+        icon: >-
+          {% set fuel = states('sensor.fireplace_propane_fuel_remaining') | float(default="unknown") %}
+          {% set capacity = states('sensor.fireplace_propane_tank_fuel_capacity') | float(default="unknown") %}
+          {# Verify data is numeric #}
+          {% if fuel == "unknown" or capacity == "unknown" %}
+            mdi:alert
+          {% else %}
+            {% set fuel_percent = (fuel/capacity)*100 %}
+            {% if fuel <= 3 %}{# 3lb is empty, regardless of capacity #}
+              mdi:gauge-empty
+            {% elif fuel_percent > 60 %}{# "full" #}
+              mdi:gauge-full
+            {% elif fuel_percent > 30 %}{# "slightly over half" #}
+              mdi:gauge
+            {% elif fuel_percent <= 30 %}{# "slightly under half" #}
+              mdi:gauge-low
+            {% endif %}
+          {% endif %}
+        device_class: "weight"
+        state_class: "measurement"
+        state: >
+          {{ states('sensor.fireplace_propane_weight_corrected') | float(default="unknown") - states('sensor.fireplace_propane_tank_empty_weight') | float(default="unknown") }}
+
+
+automation:
+
+  # Automation to force-sleep immediately after value update
+  - alias: "Deep Sleep ESPHome fireplace_propane"
+    trigger:
+      - platform: state
+        entity_id:
+          - sensor.fireplace_propane_weight
+    # Condition to skip if scale appears to be empty
+    condition:
+      condition: numeric_state
+      entity_id: sensor.fireplace_propane_weight
+      above: 10
+    action:
+      service: switch.turn_on
+      entity_id: switch.fireplace_propane_deep_sleep_now
+
+  # Automation to auto-zero scale input_number when empty
+  - alias: "Auto Zero fireplace_propane empty-scale offset"
+    trigger:
+      - platform: state
+        entity_id:
+          - sensor.fireplace_propane_weight
+    # Condition only if scale appears to be empty
+    condition:
+      condition: numeric_state
+      entity_id: sensor.fireplace_propane_weight
+      below: 9
+      above: -9
+    action:
+      service: input_number.set_value
+      data:
+        entity_id: input_number.fireplace_propane_scale_zero_offset
+        value: >-
+          {{ states('sensor.fireplace_propane_weight') | float(default="unknown") }}
+
+  # Automation to auto-change tank size by weight
+  - alias: "Auto Change fireplace_propane tank size selection"
+    trigger:
+      - platform: numeric_state
+        entity_id: sensor.fireplace_propane_weight_corrected
+        below: 25
+      - platform: numeric_state
+        entity_id: sensor.fireplace_propane_weight_corrected
+        above: 40
+    # Condition only if scale appears to be empty
+    condition:
+      condition: numeric_state
+      entity_id: sensor.fireplace_propane_weight_corrected
+      above: 10
+    action:
+      service: input_select.select_option
+      target:
+        entity_id: input_select.fireplace_propane_tank_size
+      data:
+        value: >-
+          {% set weight = states('sensor.fireplace_propane_weight_corrected') | float(default="unknown") %}
+          {% if weight > 40 %} {# If too high, must be bigger tank #}
+            40lb Tank
+          {% elif weight < 25 and weight > 10 %}{# If not empty and too low, must be small tank #}
+            20lb Tank
+          {% else %}
+            Unknown
+          {% endif %}
+

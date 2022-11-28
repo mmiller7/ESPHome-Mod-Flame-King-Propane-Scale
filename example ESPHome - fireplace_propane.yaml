@@ -28,8 +28,18 @@ api:
 ota:
 
 switch:
+  # Allow forced-reboot from HomeAssistant
   - platform: restart
     name: "fireplace_propane Restart"
+
+  # Allow immediate-sleep from HomeAssistant
+  # This will allow for more complex decisions
+  # and longer delay to ensure sensor updates
+  - platform: template
+    name: "fireplace_propane Deep Sleep Now"
+    icon: "mdi:sleep"
+    turn_on_action:
+      - deep_sleep.enter: do_sleep
 
 sensor:
   - platform: adc
@@ -40,20 +50,24 @@ sensor:
     device_class: "weight"
     state_class: "measurement"
     accuracy_decimals: 1
-    update_interval: 300s
+    update_interval: 15s
     force_update: true
     filters:
       - calibrate_linear:
-          - 0.66406 -> 0.0
-          #- 0.69238 -> 11.0
-          #- 0.74121 -> 31.0
-          - 0.82715 -> 68.2
+          - 0.67383 -> 0.0
+          #- 0.70312 -> 11.2
+          #- 0.75000 -> 31.0
+          - 0.83691 -> 68.2
 
 status_led:
   pin:
     number: D5
+    inverted: true
 
+# Deep sleep to save battery power
+# Default to longer wake interval in case of
+# connection issues and easier OTA update
 deep_sleep:
-  run_duration: 60s
-  sleep_duration: 59min
-                        
+  id: do_sleep
+  run_duration: "00:05:00"
+  sleep_duration: "00:59:30"
