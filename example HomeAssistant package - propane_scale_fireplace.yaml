@@ -91,6 +91,145 @@ template:
         state: >
           {{ states('sensor.fireplace_propane_weight_corrected') | float(default="unknown") - states('sensor.fireplace_propane_tank_empty_weight') | float(default="unknown") }}
 
+      # Sensor for burn rate hourly
+      - name: "Fireplace Propane Fuel Consumption Hourly"
+        unit_of_measurement: "lb/hr"
+        icon: "mdi:gas-burner" 
+        device_class: "weight"
+        state_class: "measurement"
+        state: >
+          {% set short_rate = -1 * (states('sensor.fireplace_propane_fuel_burn_rate_change_short_seconds') | float(default="unknown") * 3600) %}
+          {% set long_rate = -1 * (states('sensor.fireplace_propane_fuel_burn_rate_change_long_seconds') | float(default="unknown") * 3600) %}
+          {% set worst_rate = [long_rate] | max | round(2,default="unknown") %}
+          {% if worst_rate < 0 %}{# Burn rate can not be increasing #}
+            {{ states("sensor.fireplace_propane_fuel_consumption_hourly") }}
+          {% else %}
+            {{ worst_rate }}
+          {% endif %}
+
+      # Sensor for burn rate daily
+      - name: "Fireplace Propane Fuel Consumption Daily"
+        unit_of_measurement: "lb/day"
+        icon: "mdi:gas-burner" 
+        device_class: "weight"
+        state_class: "measurement"
+        state: >
+          {% set short_rate = -1 * (states('sensor.fireplace_propane_fuel_burn_rate_change_short_seconds') | float(default="unknown") * 3600 * 24) %}
+          {% set long_rate = -1 * (states('sensor.fireplace_propane_fuel_burn_rate_change_long_seconds') | float(default="unknown") * 3600 * 24) %}
+          {% set worst_rate = [long_rate] | max | round(2,default="unknown") %}
+          {% if worst_rate < 0 %}{# Burn rate can not be increasing #}
+            {{ states("sensor.fireplace_propane_fuel_consumption_daily") }}
+          {% else %}
+            {{ worst_rate }}
+          {% endif %}
+
+      # Sensor for est days remaining
+      - name: "Fireplace Propane Fuel Est Days Remaining"
+        unit_of_measurement: "days"
+        icon: "mdi:clock-outline" 
+        state_class: "measurement"
+        state: >
+            {% set remain = states("sensor.fireplace_propane_fuel_remaining") | float(0) %}
+            {% set rate = states("sensor.fireplace_propane_fuel_consumption_daily") | float(0) %}
+            {% if rate <= 0 %}
+              Off/Invalid
+            {% else %}
+              {{ (remain / rate) | int(0) }}
+            {% endif %}
+
+
+    # TODO: The temp compensation should be in the esp-chip, but for now it's here.  Ref temp was 57F when input-offset was -0.4 at 9:04PM on 27-Nov-2022
+  # Sensor for remaining fuel lb
+  - trigger:
+      - platform: state
+        entity_id:
+          - sensor.fireplace_propane_weight
+    sensor:
+      - name: "Fireplace Propane Fuel Remaining_polynomial"
+        unit_of_measurement: "lb"
+        icon: >-
+          {% set fuel = states('sensor.fireplace_propane_fuel_remaining') | float(default="unknown") %}
+          {% set capacity = states('sensor.fireplace_propane_tank_fuel_capacity') | float(default="unknown") %}
+          {# Verify data is numeric #}
+          {% if fuel == "unknown" or capacity == "unknown" %}
+            mdi:alert
+          {% else %}
+            {% set fuel_percent = (fuel/capacity)*100 %}
+            {% if fuel <= 3 %}{# 3lb is empty, regardless of capacity #}
+              mdi:gauge-empty
+            {% elif fuel_percent > 60 %}{# "full" #}
+              mdi:gauge-full
+            {% elif fuel_percent > 30 %}{# "slightly over half" #}
+              mdi:gauge
+            {% elif fuel_percent <= 30 %}{# "slightly under half" #}
+              mdi:gauge-low
+            {% endif %}
+          {% endif %}
+        device_class: "weight"
+        state_class: "measurement"
+        state: >
+          {% set temp = states('sensor.wx_station_temperature') | float(default=0)  %}
+          {% set tcoef_poly = 0.0032 * temp * temp - 0.1687 * temp - 4.2439 %}
+          {% set tcoef_lin = 0.1365 * temp - 11.47 %}
+          {{ states('sensor.fireplace_propane_weight_corrected') | float(default="unknown") - states('sensor.fireplace_propane_tank_empty_weight') | float(default="unknown") - tcoef_poly }}
+
+    # TODO: The temp compensation should be in the esp-chip, but for now it's here.  Ref temp was 57F when input-offset was -0.4 at 9:04PM on 27-Nov-2022
+  # Sensor for remaining fuel lb
+  - trigger:
+      - platform: state
+        entity_id:
+          - sensor.fireplace_propane_weight
+    sensor:
+      - name: "Fireplace Propane Fuel Remaining_linear"
+        unit_of_measurement: "lb"
+        icon: >-
+          {% set fuel = states('sensor.fireplace_propane_fuel_remaining') | float(default="unknown") %}
+          {% set capacity = states('sensor.fireplace_propane_tank_fuel_capacity') | float(default="unknown") %}
+          {# Verify data is numeric #}
+          {% if fuel == "unknown" or capacity == "unknown" %}
+            mdi:alert
+          {% else %}
+            {% set fuel_percent = (fuel/capacity)*100 %}
+            {% if fuel <= 3 %}{# 3lb is empty, regardless of capacity #}
+              mdi:gauge-empty
+            {% elif fuel_percent > 60 %}{# "full" #}
+              mdi:gauge-full
+            {% elif fuel_percent > 30 %}{# "slightly over half" #}
+              mdi:gauge
+            {% elif fuel_percent <= 30 %}{# "slightly under half" #}
+              mdi:gauge-low
+            {% endif %}
+          {% endif %}
+        device_class: "weight"
+        state_class: "measurement"
+        state: >
+          {% set temp = states('sensor.wx_station_temperature') | float(default=0)  %}
+          {% set tcoef_poly = 0.0032 * temp * temp - 0.1687* temp - 4.2439 %}
+          {% set tcoef_lin = 0.1365 * temp - 11.47 %}
+          {{ states('sensor.fireplace_propane_weight_corrected') | float(default="unknown") - states('sensor.fireplace_propane_tank_empty_weight') | float(default="unknown") - tcoef_lin }}
+
+
+sensor:
+
+  - platform: statistics
+    name: "Fireplace Propane Fuel Burn Rate Change Long Seconds"
+    entity_id: sensor.fireplace_propane_fuel_remaining
+    state_characteristic: change_second
+    precision: 20
+    sampling_size: 75
+    max_age:
+      hours: 24
+
+  - platform: statistics
+    name: "Fireplace Propane Fuel Burn Rate Change Short Seconds"
+    entity_id: sensor.fireplace_propane_fuel_remaining
+    state_characteristic: change_second
+    precision: 20
+    sampling_size: 25
+    max_age:
+      hours: 6
+
+
 
 automation:
 
@@ -125,6 +264,7 @@ automation:
       service: input_number.set_value
       data:
         entity_id: input_number.fireplace_propane_scale_zero_offset
+        # Formula for this attempted scale factor = (gas_weight_at_ref_temp - min_gas_weight) / (ref_temp - min_temp)
         value: >-
           {{ states('sensor.fireplace_propane_weight') | float(default="unknown") }}
 
@@ -156,4 +296,3 @@ automation:
           {% else %}
             Unknown
           {% endif %}
-

@@ -2,15 +2,36 @@ esphome:
   name: fireplace_propane
   platform: ESP8266
   board: d1_mini
+    
+  on_boot:
+    # priorities: https://esphome.io/api/namespaceesphome_1_1setup__priority.html#ae948d01216eb5ed6e959b44982109f5d 
+    - priority: 700
+      then:
+        # Turn on the pin which powers the sensors
+        - switch.turn_on: sensor_power
+
+        # Wait for the power bus to stabilize
+        # NOTE: This is especially critical for
+        # the Dallas Hub to properly detect sensors.
+        #   50mS - too short - not detecting
+        #   60mS - seems stable in some tests
+        #   120mS - allows extra buffer to stabilize
+        - lambda: |-
+            delay(120);
+
+  on_shutdown:
+    - priority: 700
+      then:
+        # Turn off the pin which powers the sensors
+        - switch.turn_off: sensor_power
+
+
 
 wifi:
   networks:
-  - ssid: !secret ssid
-    password: !secret password
-    priority: 1
+    - ssid: !secret ssid
+      password: !secret password
   domain: !secret dns_suffix
-
-  #power_save_mode: none
 
   # Enable fallback hotspot (captive portal) in case wifi connection fails
   ap:
@@ -27,7 +48,16 @@ api:
 
 ota:
 
+
+
 switch:
+  # Power switch to load cell and temperature sensor circuitry
+  - platform: gpio
+    pin: D6
+    id: sensor_power
+    name: "Sensor Power"
+    internal: true
+
   # Allow forced-reboot from HomeAssistant
   - platform: restart
     name: "fireplace_propane Restart"
@@ -41,10 +71,23 @@ switch:
     turn_on_action:
       - deep_sleep.enter: do_sleep
 
+
+
+# To use your dallas sensor, first define a dallas “hub” with a pin
+# This is where the data-pin of the DS18B20 temp-sensor is connected
+dallas:
+  - pin: D7
+    update_interval: 15s
+
+
+
 sensor:
+
+  # Load cell amp analog signal in scale
   - platform: adc
     pin: A0
-    name: "fireplace_propane Weight"
+    name: "fireplace_propane Weight Raw"
+    id: fireplace_propane_weight_raw
     unit_of_measurement: "lb"
     icon: "mdi:scale"
     device_class: "weight"
@@ -52,12 +95,61 @@ sensor:
     accuracy_decimals: 1
     update_interval: 15s
     force_update: true
+    #internal: true
     filters:
       - calibrate_linear:
-          - 0.67383 -> 0.0
-          #- 0.70312 -> 11.2
-          #- 0.75000 -> 31.0
-          - 0.83691 -> 68.2
+          # Calibration done at 70-71F
+          # Zero-Weight Calibration:
+          - 0.671875 -> 0.0
+          # Large-WEight Calibration:
+          - 0.834961 -> 68.2
+    on_value:
+      # Update the component that computes the temperature-compensated weight every time we get a new weight
+      - component.update: fireplace_propane_weight
+      - logger.log:
+          format: "*CALIBRATE Weight ADC: adc_raw=%.6f / output=%.2f lb"
+          args: [ 'id(fireplace_propane_weight_raw).raw_state', 'id(fireplace_propane_weight_raw).state' ]
+
+  # Temperature sensor
+  - platform: dallas
+    index: 0
+    id: fireplace_propane_temperature
+    name: "fireplace_propane Temperature"
+    #internal: true
+
+  # Adjustment to compute weight correction based on current temperature
+  - platform: copy
+    source_id: fireplace_propane_temperature
+    name: "fireplace_propane Temperature Weight Correction"
+    id: fireplace_propane_temperature_weight_correction
+    unit_of_measurement: "lb"
+    internal: true
+    filters:
+      - calibrate_linear:
+          # Temp -> Error correction weight delta
+          # Weight Calibration Temp -> 0
+          - 22.31 -> 0.0
+          # Colder/Hotter Temp -> +/- correction
+          - 1.67 -> 6.5
+    on_value:
+      - logger.log:
+          format: "*CALIBRATE Temp LB-Correction: temp_raw=%.2f / output=%.2f lb"
+          args: [ 'id(fireplace_propane_temperature_weight_correction).raw_state', 'id(fireplace_propane_temperature_weight_correction).state' ]
+
+  # Final output sensor to return the temperature-compensated weight
+  - platform: template
+    name: "fireplace_propane Weight"
+    id: fireplace_propane_weight
+    unit_of_measurement: "lb"
+    icon: "mdi:scale"
+    device_class: "weight"
+    state_class: "measurement"
+    accuracy_decimals: 1
+    # This is manually updated by the adc sensor on value change
+    update_interval: never
+    force_update: true
+    lambda: |-
+      return id(fireplace_propane_weight_raw).state + id(fireplace_propane_temperature_weight_correction).state;
 
 status_led:
   pin:
@@ -70,4 +162,4 @@ status_led:
 deep_sleep:
   id: do_sleep
   run_duration: "00:05:00"
-  sleep_duration: "00:59:30"
+  sleep_duration: "00:30:00"
