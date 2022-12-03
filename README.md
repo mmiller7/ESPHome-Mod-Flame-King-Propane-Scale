@@ -116,6 +116,7 @@ Modification Pics - installation in housing
 * ESP8266 Fit in scale.JPG
 
 Modification Pics - Wiring Reference
+* Example Trace Cut.jpg
 * (ppt export) Slide 1 - Load Cell Original Wiring.JPG
 * (ppt export) Slide 2 - Bottom Signal and Power Tap Points.JPG
 * (ppt export) Slide 3 - Top Modification and Power Tap Points.JPG
@@ -148,6 +149,8 @@ The Modification Process:
 6. Use a knife or other tool (I recommend a Dremel cutoff wheel to "grind" away) to cut thru
    the PCB trace next to the internal slide-switch to isolate the sensor-power rail from the
    always-on 3.3v regulated power rail.
+	 Reference diagram: "Modification Pics/Slide 2 - Bottom Signal and Power Tap Points.JPG"
+	 Example Photo: "Modification Pics/Example Trace Cut.jpg"
 
 7. Use small wire, connect each of the power and signal wires to the ESP8266 board on the
    side that the components are populated on (where you removed the microcontroller).
