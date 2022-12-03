@@ -138,76 +138,6 @@ template:
             {% endif %}
 
 
-    # TODO: The temp compensation should be in the esp-chip, but for now it's here.  Ref temp was 57F when input-offset was -0.4 at 9:04PM on 27-Nov-2022
-  # Sensor for remaining fuel lb
-  - trigger:
-      - platform: state
-        entity_id:
-          - sensor.fireplace_propane_weight
-    sensor:
-      - name: "Fireplace Propane Fuel Remaining_polynomial"
-        unit_of_measurement: "lb"
-        icon: >-
-          {% set fuel = states('sensor.fireplace_propane_fuel_remaining') | float(default="unknown") %}
-          {% set capacity = states('sensor.fireplace_propane_tank_fuel_capacity') | float(default="unknown") %}
-          {# Verify data is numeric #}
-          {% if fuel == "unknown" or capacity == "unknown" %}
-            mdi:alert
-          {% else %}
-            {% set fuel_percent = (fuel/capacity)*100 %}
-            {% if fuel <= 3 %}{# 3lb is empty, regardless of capacity #}
-              mdi:gauge-empty
-            {% elif fuel_percent > 60 %}{# "full" #}
-              mdi:gauge-full
-            {% elif fuel_percent > 30 %}{# "slightly over half" #}
-              mdi:gauge
-            {% elif fuel_percent <= 30 %}{# "slightly under half" #}
-              mdi:gauge-low
-            {% endif %}
-          {% endif %}
-        device_class: "weight"
-        state_class: "measurement"
-        state: >
-          {% set temp = states('sensor.wx_station_temperature') | float(default=0)  %}
-          {% set tcoef_poly = 0.0032 * temp * temp - 0.1687 * temp - 4.2439 %}
-          {% set tcoef_lin = 0.1365 * temp - 11.47 %}
-          {{ states('sensor.fireplace_propane_weight_corrected') | float(default="unknown") - states('sensor.fireplace_propane_tank_empty_weight') | float(default="unknown") - tcoef_poly }}
-
-    # TODO: The temp compensation should be in the esp-chip, but for now it's here.  Ref temp was 57F when input-offset was -0.4 at 9:04PM on 27-Nov-2022
-  # Sensor for remaining fuel lb
-  - trigger:
-      - platform: state
-        entity_id:
-          - sensor.fireplace_propane_weight
-    sensor:
-      - name: "Fireplace Propane Fuel Remaining_linear"
-        unit_of_measurement: "lb"
-        icon: >-
-          {% set fuel = states('sensor.fireplace_propane_fuel_remaining') | float(default="unknown") %}
-          {% set capacity = states('sensor.fireplace_propane_tank_fuel_capacity') | float(default="unknown") %}
-          {# Verify data is numeric #}
-          {% if fuel == "unknown" or capacity == "unknown" %}
-            mdi:alert
-          {% else %}
-            {% set fuel_percent = (fuel/capacity)*100 %}
-            {% if fuel <= 3 %}{# 3lb is empty, regardless of capacity #}
-              mdi:gauge-empty
-            {% elif fuel_percent > 60 %}{# "full" #}
-              mdi:gauge-full
-            {% elif fuel_percent > 30 %}{# "slightly over half" #}
-              mdi:gauge
-            {% elif fuel_percent <= 30 %}{# "slightly under half" #}
-              mdi:gauge-low
-            {% endif %}
-          {% endif %}
-        device_class: "weight"
-        state_class: "measurement"
-        state: >
-          {% set temp = states('sensor.wx_station_temperature') | float(default=0)  %}
-          {% set tcoef_poly = 0.0032 * temp * temp - 0.1687* temp - 4.2439 %}
-          {% set tcoef_lin = 0.1365 * temp - 11.47 %}
-          {{ states('sensor.fireplace_propane_weight_corrected') | float(default="unknown") - states('sensor.fireplace_propane_tank_empty_weight') | float(default="unknown") - tcoef_lin }}
-
 
 sensor:
 
@@ -264,7 +194,6 @@ automation:
       service: input_number.set_value
       data:
         entity_id: input_number.fireplace_propane_scale_zero_offset
-        # Formula for this attempted scale factor = (gas_weight_at_ref_temp - min_gas_weight) / (ref_temp - min_temp)
         value: >-
           {{ states('sensor.fireplace_propane_weight') | float(default="unknown") }}
 
@@ -274,6 +203,7 @@ automation:
       - platform: numeric_state
         entity_id: sensor.fireplace_propane_weight_corrected
         below: 25
+        above: 10
       - platform: numeric_state
         entity_id: sensor.fireplace_propane_weight_corrected
         above: 40
