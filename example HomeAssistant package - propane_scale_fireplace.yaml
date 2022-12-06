@@ -137,6 +137,12 @@ template:
               {{ (remain / rate) | int(0) }}
             {% endif %}
 
+      # Sensor for est days remaining
+      - name: "Fireplace Propane Weight Age"
+        unit_of_measurement: "Seconds"
+        state: >
+          {{ (now() - states.sensor.fireplace_propane_weight.last_updated).total_seconds() | round(0,default=0) }}
+
 
 
 sensor:
