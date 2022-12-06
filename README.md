@@ -1,7 +1,7 @@
 # ESPHome-Mod-Flame-King-Propane-Scale
 High level reverse-engineering and modification of Flame King YSN-PS1 Bluetooth propane scale to ESPHome WiFi
 
-
+-
 
 Overview:
 
@@ -9,7 +9,7 @@ This project started because I wanted a propane tank scale so I could track (and
 the propane tank running our gas fireplace.  This was made harder because I use 40lb tanks and many
 scales only support 20lb tanks.
 
-
+-
 
 Recommended Modification Tools/Parts:
 
@@ -32,7 +32,7 @@ Information:
 * Empty weight of your tank (this is the number marked "TW" stamped on the handle of your tank)
 * Max allowed fill of your tank when full (this is the traditional named-size like 20lb for a BBQ)
 
-
+-
 
 Background:
 
@@ -84,7 +84,7 @@ thru the battery compartment hole or by cutting a tiny notch in the cover plate 
 a mains USB adapter, but my appication is not near a mains outlet (remember, propane you want
 away from sources of ignition and away from the house to the extent practical for safety).
 
-
+-
 
 In the process, I have learned a few things noteworthy:
 * The factory board has a voltage regulator that holds 3.3v from input range 1.75-3.35 volts.
@@ -96,7 +96,7 @@ In the process, I have learned a few things noteworthy:
   a large capacitor across the power rail where the ESP8266 taps off seems to help.
 * The load cell calibration drifts with temperature.  Results varied by 6-7lb over 30F.
 
-
+-
 
 GitHub Files:
 Board Pics - Front/Back scaled to identical size and flpped to match positionally.  You can
@@ -127,7 +127,7 @@ Modification Pics - Wiring Reference
 * (ppt export) Slide 4 - Pinouts.JPG
 * wiring.pptx
 
-
+-
 
 The Modification Process:
 
@@ -251,7 +251,7 @@ The Modification Process:
 
        8. OTA update the ESP8266 firmware with your new YAML file to fix calibartion
 
-
+-
 
 Bonus Knowledge:
 
