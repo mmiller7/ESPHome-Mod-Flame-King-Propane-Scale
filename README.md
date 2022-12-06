@@ -286,8 +286,7 @@ capacity that you can calculate based on the information on the tank.
 
 Let's compute the maximum allowable quantity of Propane for this tank...
 
-WC 47.6 -> 47.6 pounds of water
-Water weighs 8.345 pounds
+WC 47.6 -> 47.6 pounds of water; Water weighs 8.345 pounds
 ```
 Maths: 47.6 / 8.345 = 5.70401438 gallons
 ```
@@ -322,7 +321,7 @@ Maths: 17.1 lb empty + 18.9 lb fuel = 36 lb total weight
 ```
 
 The reverse is also possible, which is how my automation works...
-Weight the whole thing - suppose you measure 25 lb
+Weight the whole thing - suppose you put it on a scale and measure 25 lb
 ```
 Maths: 25 lb measured total - 17.1 lb empty = 7.9 lb fuel remaining
 ```
