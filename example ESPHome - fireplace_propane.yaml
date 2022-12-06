@@ -17,7 +17,7 @@ esphome:
         #   60mS - seems stable in some tests
         #   120mS - allows extra buffer to stabilize
         - lambda: |-
-            delay(120);
+            delay(150);
 
   on_shutdown:
     - priority: 700
@@ -100,8 +100,8 @@ sensor:
       - calibrate_linear:
           # Calibration done at 70-71F
           # Zero-Weight Calibration:
-          - 0.671875 -> 0.0
-          # Large-WEight Calibration:
+          - 0.669922 -> 0.0
+          # Large-Weight Calibration:
           - 0.834961 -> 68.2
     on_value:
       # Update the component that computes the temperature-compensated weight every time we get a new weight
@@ -126,11 +126,12 @@ sensor:
     internal: true
     filters:
       - calibrate_linear:
-          # Temp -> Error correction weight delta
-          # Weight Calibration Temp -> 0
-          - 22.31 -> 0.0
-          # Colder/Hotter Temp -> +/- correction
-          - 1.67 -> 6.5
+            # Temp -> Error correction weight delta
+            # Weight Calibration Temp -> 0
+            - 21.9 -> 0.0
+            # Colder/Hotter Temp -> +/- correction computed using known weight
+            #- -1.61 -> 6.7
+            - 3.3 -> 7.7
     on_value:
       - logger.log:
           format: "*CALIBRATE Temp LB-Correction: temp_raw=%.2f / output=%.2f lb"

@@ -100,7 +100,7 @@ template:
         state: >
           {% set short_rate = -1 * (states('sensor.fireplace_propane_fuel_burn_rate_change_short_seconds') | float(default="unknown") * 3600) %}
           {% set long_rate = -1 * (states('sensor.fireplace_propane_fuel_burn_rate_change_long_seconds') | float(default="unknown") * 3600) %}
-          {% set worst_rate = [long_rate] | max | round(2,default="unknown") %}
+          {% set worst_rate = [short_rate,long_rate] | max | round(2,default="unknown") %}
           {% if worst_rate < 0 %}{# Burn rate can not be increasing #}
             {{ states("sensor.fireplace_propane_fuel_consumption_hourly") }}
           {% else %}
@@ -116,7 +116,7 @@ template:
         state: >
           {% set short_rate = -1 * (states('sensor.fireplace_propane_fuel_burn_rate_change_short_seconds') | float(default="unknown") * 3600 * 24) %}
           {% set long_rate = -1 * (states('sensor.fireplace_propane_fuel_burn_rate_change_long_seconds') | float(default="unknown") * 3600 * 24) %}
-          {% set worst_rate = [long_rate] | max | round(2,default="unknown") %}
+          {% set worst_rate = [short_rate,long_rate] | max | round(2,default="unknown") %}
           {% if worst_rate < 0 %}{# Burn rate can not be increasing #}
             {{ states("sensor.fireplace_propane_fuel_consumption_daily") }}
           {% else %}
@@ -157,7 +157,7 @@ sensor:
     precision: 20
     sampling_size: 25
     max_age:
-      hours: 6
+      hours: 3
 
 
 
@@ -175,8 +175,9 @@ automation:
       entity_id: sensor.fireplace_propane_weight
       above: 10
     action:
-      service: switch.turn_on
-      entity_id: switch.fireplace_propane_deep_sleep_now
+      - delay: "00:00:01"
+      - service: switch.turn_on
+        entity_id: switch.fireplace_propane_deep_sleep_now
 
   # Automation to auto-zero scale input_number when empty
   - alias: "Auto Zero fireplace_propane empty-scale offset"
@@ -214,10 +215,9 @@ automation:
       above: 10
     action:
       service: input_select.select_option
-      target:
-        entity_id: input_select.fireplace_propane_tank_size
       data:
-        value: >-
+        entity_id: input_select.fireplace_propane_tank_size
+        option: >-
           {% set weight = states('sensor.fireplace_propane_weight_corrected') | float(default="unknown") %}
           {% if weight > 40 %} {# If too high, must be bigger tank #}
             40lb Tank
