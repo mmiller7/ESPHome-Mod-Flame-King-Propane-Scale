@@ -260,6 +260,7 @@ identify and calculate capacities and weights...
 
 There are various pieces of information stamped on your tank handle (at least in USA),
 here are a few examples from a 20lb tank I have:
+```
 WC 21.6L   -> 100% full volume Water Capacity in Liters
 T 8.0KG    -> Empty Tare Weight in KG
 DT 101.6MM -> (unknown)
@@ -271,11 +272,14 @@ DT 4.0     -> Type of valve?
 M4014      -> Manufacturer code
 SJ         -> (unknown)
 02 22      -> February 2022 Manufacture Date (most new tanks are certified for 12 years in the USA)
+```
 
 Of these, there are only really 3 that are of interest:
+```
 TW 17.1 -> Empty weight, we need to know for computations
 WC 47.6 -> How much it can hold at 100% full
 02 22   -> How old it is, so you know if it will be rejected when you get it refilled
+```
 
 Rules require portable tanks never be filled over 80% for safety.  This means there is a maximum
 capacity that you can calculate based on the information on the tank.
@@ -284,10 +288,14 @@ Let's compute the maximum allowable quantity of Propane for this tank...
 
 WC 47.6 -> 47.6 pounds of water
 Water weighs 8.345 pounds
+```
 Maths: 47.6 / 8.345 = 5.70401438 gallons
+```
 
 Now we can only legally put 80% of that in it for safety:
+```
 Maths: 5.70401438 * 0.8 = 4.563211504 gallons
+```
 
 * Reputable filling stations will charge you by-the-gallon for how much they pump into your tank.
   This also means you can take a mostly-empty tank and have it filled, only paying for what they
@@ -297,23 +305,33 @@ Maths: 5.70401438 * 0.8 = 4.563211504 gallons
 
 But for useful stats to measure quantity of fuel, we need some more conversions to pounds.
 At room temperature "77F" propane weighs 4.11 pounds per gallon.
+```
 Maths: 4.563211504 * 4.11 = 18.754799281 pounds
+```
 or if you rounded off...
+```
 Maths: 4.6 * 4.11 = 18.906 pounds
+```
 
 Now we need to know what a scale would read, so we go find the empty weight marked "TW"
 TW 17.1 lb
 
 So to know the tank weight on a scale what it ought to be when filled, we do more maths
+```
 Maths: 17.1 lb empty + 18.9 lb fuel = 36 lb total weight
+```
 
 The reverse is also possible, which is how my automation works...
 Weight the whole thing - suppose you measure 25 lb
+```
 Maths: 25 lb measured total - 17.1 lb empty = 7.9 lb fuel remaining
+```
 
 An annoying thing once you learn all this, you may notice the swap-stations don't add up.
 It seems all the ones I've gone to take "80% of 80%" for reasons I don't understand.
+```
 Maths: 18.9lb * 0.8 = 15.1 lb
+```
 And that matches up with my experience of tank-swaps when I put them on a scale I measure
 about 14.5-15.0 pounds of gas after subtracting the empty-weight.
 
