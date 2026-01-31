@@ -1,5 +1,24 @@
 # Home Assistant interfacing for propane tank scale operation
 
+
+# Detect if the sensor is awake or asleep
+command_line:
+  - binary_sensor:
+      command: 'ping -c 1 -W 3 fireplace_propane.local >> /dev/null && echo pass || echo fail'
+      payload_on: pass
+      payload_off: fail
+      name: Fireplace Propane Sensor Reachable
+      scan_interval: 5
+      command_timeout: 4
+      device_class: connectivity
+# PING sensors were moved to GUI-only so this was ported to command_line sensor
+#binary_sensor:
+#  - platform: ping
+#    name: Fireplace Propane Sensor Reachable
+#    host: fireplace_propane.local
+#    count: 1
+#    scan_interval: 10
+
 # Selection for size of tank
 input_select:
   fireplace_propane_tank_size:
@@ -10,28 +29,10 @@ input_select:
     initial: 40lb Tank
     icon: mdi:propane-tank-outline
 
-# scale zero offset for calibration
-input_number:
-  fireplace_propane_scale_zero_offset:
-    name: Fireplace Propane Scale Zero Offset
-    min: -9
-    max: 9
-    step: 0.1
-    unit_of_measurement: "lb" 
-
 
 template:
   
   - sensor:
-
-      # Sensor for scale zero weight offset
-      - name: "Fireplace Propane Weight Corrected"
-        unit_of_measurement: "lb"
-        icon: "mdi:scale"
-        device_class: "weight"
-        state_class: "measurement"
-        state: >
-          {{ states('sensor.fireplace_propane_weight') | float(default="unknown") - states('input_number.fireplace_propane_scale_zero_offset') | float(default="unknown") }}
 
       # Sensor for tank empty weight
       - name: "Fireplace Propane Tank Empty Weight"
@@ -68,6 +69,12 @@ template:
       # Sensor for remaining fuel lb
       - name: "Fireplace Propane Fuel Remaining"
         unit_of_measurement: "lb"
+        availability: >-
+          {% set weight = states('sensor.fireplace_propane_weight') | float(default="unknown") %}
+          {% set empty_weight = states('sensor.fireplace_propane_tank_empty_weight') | float(default="unknown") %}
+          {% set capacity = states('sensor.fireplace_propane_tank_fuel_capacity') | float(default="unknown") %}
+          {# Verify data is numeric #}
+          {{ weight != "unknown" and empty_weight != "unknown" and capacity != "unknown" }}
         icon: >-
           {% set fuel = states('sensor.fireplace_propane_fuel_remaining') | float(default="unknown") %}
           {% set capacity = states('sensor.fireplace_propane_tank_fuel_capacity') | float(default="unknown") %}
@@ -89,18 +96,20 @@ template:
         device_class: "weight"
         state_class: "measurement"
         state: >
-          {{ states('sensor.fireplace_propane_weight_corrected') | float(default="unknown") - states('sensor.fireplace_propane_tank_empty_weight') | float(default="unknown") }}
+          {{ (states('sensor.fireplace_propane_weight') | float(default="unknown") - states('sensor.fireplace_propane_tank_empty_weight') | float(default="unknown") ) | round(1) }}
 
       # Sensor for burn rate hourly
       - name: "Fireplace Propane Fuel Consumption Hourly"
         unit_of_measurement: "lb/hr"
         icon: "mdi:gas-burner" 
-        device_class: "weight"
+        #device_class: "weight"
         state_class: "measurement"
+        availability: "{{ states('sensor.fireplace_propane_fuel_burn_rate_change_short_seconds') | float(default=9999) != 9999 or states('sensor.fireplace_propane_fuel_burn_rate_change_long_seconds') | float(9999) != 9999 or (this.state | int(-9999)) != -9999 }}"
         state: >
-          {% set short_rate = -1 * (states('sensor.fireplace_propane_fuel_burn_rate_change_short_seconds') | float(default="unknown") * 3600) %}
-          {% set long_rate = -1 * (states('sensor.fireplace_propane_fuel_burn_rate_change_long_seconds') | float(default="unknown") * 3600) %}
-          {% set worst_rate = [short_rate,long_rate] | max | round(2,default="unknown") %}
+          {% set short_rate = -1 * (states('sensor.fireplace_propane_fuel_burn_rate_change_short_seconds') | float(default=9999) * 3600) %}
+          {% set long_rate = -1 * (states('sensor.fireplace_propane_fuel_burn_rate_change_long_seconds') | float(9999) * 3600) %}
+          {# set worst_rate = [short_rate,long_rate] | max | round(2,default=-9999) #}
+          {% set worst_rate = (short_rate if long_rate < 0 else long_rate)| round(2,default=-9999) %}
           {% if worst_rate < 0 %}{# Burn rate can not be increasing #}
             {{ states("sensor.fireplace_propane_fuel_consumption_hourly") }}
           {% else %}
@@ -111,12 +120,14 @@ template:
       - name: "Fireplace Propane Fuel Consumption Daily"
         unit_of_measurement: "lb/day"
         icon: "mdi:gas-burner" 
-        device_class: "weight"
+        #device_class: "weight"
         state_class: "measurement"
+        availability: "{{ states('sensor.fireplace_propane_fuel_burn_rate_change_short_seconds') | float(default=9999) != 9999 or states('sensor.fireplace_propane_fuel_burn_rate_change_long_seconds') | float(9999) != 9999 or (this.state | int(-9999)) != -9999 }}"
         state: >
-          {% set short_rate = -1 * (states('sensor.fireplace_propane_fuel_burn_rate_change_short_seconds') | float(default="unknown") * 3600 * 24) %}
-          {% set long_rate = -1 * (states('sensor.fireplace_propane_fuel_burn_rate_change_long_seconds') | float(default="unknown") * 3600 * 24) %}
-          {% set worst_rate = [short_rate,long_rate] | max | round(2,default="unknown") %}
+          {% set short_rate = -1 * (states('sensor.fireplace_propane_fuel_burn_rate_change_short_seconds') | float(default=9999) * 3600 * 24) %}
+          {% set long_rate = -1 * (states('sensor.fireplace_propane_fuel_burn_rate_change_long_seconds') | float(default=9999) * 3600 * 24) %}
+          {# set worst_rate = [short_rate,long_rate] | max | round(2,default=-9999) #}
+          {% set worst_rate = (short_rate if long_rate < 0 else long_rate)| round(2,default=-9999) %}
           {% if worst_rate < 0 %}{# Burn rate can not be increasing #}
             {{ states("sensor.fireplace_propane_fuel_consumption_daily") }}
           {% else %}
@@ -128,6 +139,10 @@ template:
         unit_of_measurement: "days"
         icon: "mdi:clock-outline" 
         state_class: "measurement"
+        availability: >-
+            {% set remain = states("sensor.fireplace_propane_fuel_remaining") | float(0) %}
+            {% set rate = states("sensor.fireplace_propane_fuel_consumption_daily") | float(0) %}
+            {{ rate > 0 }}
         state: >
             {% set remain = states("sensor.fireplace_propane_fuel_remaining") | float(0) %}
             {% set rate = states("sensor.fireplace_propane_fuel_consumption_daily") | float(0) %}
@@ -137,7 +152,7 @@ template:
               {{ (remain / rate) | int(0) }}
             {% endif %}
 
-      # Sensor for est days remaining
+      # Sensor for when the weight was last reported
       - name: "Fireplace Propane Weight Age"
         unit_of_measurement: "Seconds"
         state: >
@@ -145,86 +160,181 @@ template:
 
 
 
+  - binary_sensor:
+
+      - name: "Fireplace Propane Low"
+        availability: >-
+          {{ (not is_state('sensor.fireplace_propane_fuel_est_days_remaining','unavailable')) and
+             (not is_state('sensor.fireplace_propane_fuel_remaining','unavailable')) }}
+        state: >-
+          {% set days_remain = states('sensor.fireplace_propane_fuel_est_days_remaining') | float(default=-1) %}
+          {% set lbs_remain = states('sensor.fireplace_propane_fuel_remaining') | float(default=-1) %}
+          {{ days_remain < 7 or lbs_remain < 5 }}
+        delay_on: '01:00:00'
+        icon: >
+          {% if is_state("binary_sensor.fireplace_propane_low","on") %}
+            mdi:storage-tank-outline
+          {% else %}
+            mdi:storage-tank
+          {% endif %}
+
+
+
+
+
 sensor:
 
+  # Average Sensor to smooth steps
+  - platform: statistics
+    name: "Fireplace Propane Fuel Remaining Long Average"
+    entity_id: sensor.fireplace_propane_fuel_remaining
+    state_characteristic: average_linear
+    precision: 2
+    #sampling_size: 8
+    max_age:
+      hours: 48
+
+  - platform: statistics
+    name: "Fireplace Propane Fuel Remaining Short Average"
+    entity_id: sensor.fireplace_propane_fuel_remaining
+    state_characteristic: average_linear
+    precision: 2
+    #sampling_size: 8
+    max_age:
+      hours: 6
+
+  # Rate Of Change Sensors
   - platform: statistics
     name: "Fireplace Propane Fuel Burn Rate Change Long Seconds"
-    entity_id: sensor.fireplace_propane_fuel_remaining
+    entity_id: sensor.fireplace_propane_fuel_remaining_long_average
     state_characteristic: change_second
     precision: 20
-    sampling_size: 75
+    #sampling_size: 400
     max_age:
-      hours: 24
+      hours: 48
 
   - platform: statistics
     name: "Fireplace Propane Fuel Burn Rate Change Short Seconds"
-    entity_id: sensor.fireplace_propane_fuel_remaining
+    entity_id: sensor.fireplace_propane_fuel_remaining_short_average
     state_characteristic: change_second
     precision: 20
-    sampling_size: 25
+    #sampling_size: 100
     max_age:
-      hours: 3
+      hours: 6
 
 
 
 automation:
 
-  # Automation to force-sleep immediately after value update
-  - alias: "Deep Sleep ESPHome fireplace_propane"
+# These are obsolete now that its USB powered
+#
+#  # Automation to apply update immediately after value update
+#  - alias: "Upgrade Firmware ESPHome fireplace_propane"
+#    id: "Upgrade Firmware ESPHome fireplace_propane"
+#    initial_state: false
+#    trigger:
+#      - platform: state
+#        entity_id:
+#          - sensor.fireplace_propane_weight
+#    # So we don't try and update firmware while its in an odd state
+#    condition:
+#      - condition: state
+#        entity_id: binary_sensor.fireplace_propane_sensor_reachable
+#        state: "on"
+#      - condition: not
+#        conditions:
+#          - condition: state
+#            entity_id: sensor.fireplace_propane_weight
+#            state: "unknown"
+#    action:
+#      - service: update.install
+#        data: {}
+#        target:
+#          entity_id:
+#            - update.fireplace_propane_firmware
+#      - service: automation.turn_off
+#        target:
+#          entity_id: automation.upgrade_firmware_esphome_fireplace_propane
+#
+#
+#  # Automation to force-sleep immediately after value update
+#  - alias: "Deep Sleep ESPHome fireplace_propane"
+#    id: "Deep Sleep ESPHome fireplace_propane"
+#    trigger:
+#      - platform: state
+#        entity_id:
+#          - sensor.fireplace_propane_weight
+#        for: '00:00:05'
+#    # Condition to skip if scale appears to be empty
+#    condition:
+#      - condition: state
+#        entity_id: binary_sensor.fireplace_propane_sensor_reachable
+#        state: "on"
+#      - condition: not
+#        conditions:
+#          - condition: state
+#            entity_id: sensor.fireplace_propane_weight
+#            state: "unknown"
+#      - condition: numeric_state
+#        entity_id: sensor.fireplace_propane_weight
+#        above: 10
+#      # Handles avoiding sleep when firmware update will be done
+#      # Continue if: firmware update disabled OR firmware is up to date
+#      - condition: or
+#        conditions:
+#          - condition: state
+#            entity_id: automation.upgrade_firmware_esphome_fireplace_propane
+#            state: "off"
+#          - condition: state
+#            entity_id: update.fireplace_propane_firmware
+#            state: "off"
+#    action:
+#      - service: switch.turn_on
+#        entity_id: switch.fireplace_propane_deep_sleep_now
+ 
+  # Automation to force-reset immediately if to unknown
+  - alias: "Reset Bad Data ESPHome fireplace_propane"
+    id: "Reset Bad Data ESPHome fireplace_propane"
     trigger:
       - platform: state
         entity_id:
           - sensor.fireplace_propane_weight
+        to: unknown
+        for: '00:00:01'
     # Condition to skip if scale appears to be empty
     condition:
-      condition: numeric_state
-      entity_id: sensor.fireplace_propane_weight
-      above: 10
+      - condition: state
+        entity_id: binary_sensor.fireplace_propane_sensor_reachable
+        state: "on"
+      - condition: state
+        entity_id: sensor.fireplace_propane_weight
+        state: "unknown"
     action:
-      - delay: "00:00:01"
       - service: switch.turn_on
-        entity_id: switch.fireplace_propane_deep_sleep_now
-
-  # Automation to auto-zero scale input_number when empty
-  - alias: "Auto Zero fireplace_propane empty-scale offset"
-    trigger:
-      - platform: state
-        entity_id:
-          - sensor.fireplace_propane_weight
-    # Condition only if scale appears to be empty
-    condition:
-      condition: numeric_state
-      entity_id: sensor.fireplace_propane_weight
-      below: 9
-      above: -9
-    action:
-      service: input_number.set_value
-      data:
-        entity_id: input_number.fireplace_propane_scale_zero_offset
-        value: >-
-          {{ states('sensor.fireplace_propane_weight') | float(default="unknown") }}
+        entity_id: switch.fireplace_propane_restart
 
   # Automation to auto-change tank size by weight
   - alias: "Auto Change fireplace_propane tank size selection"
+    id: "Auto Change fireplace_propane tank size selection"
     trigger:
       - platform: numeric_state
-        entity_id: sensor.fireplace_propane_weight_corrected
+        entity_id: sensor.fireplace_propane_weight
         below: 25
         above: 10
       - platform: numeric_state
-        entity_id: sensor.fireplace_propane_weight_corrected
+        entity_id: sensor.fireplace_propane_weight
         above: 40
     # Condition only if scale appears to be empty
     condition:
       condition: numeric_state
-      entity_id: sensor.fireplace_propane_weight_corrected
+      entity_id: sensor.fireplace_propane_weight
       above: 10
     action:
       service: input_select.select_option
       data:
         entity_id: input_select.fireplace_propane_tank_size
         option: >-
-          {% set weight = states('sensor.fireplace_propane_weight_corrected') | float(default="unknown") %}
+          {% set weight = states('sensor.fireplace_propane_weight') | float(default="unknown") %}
           {% if weight > 40 %} {# If too high, must be bigger tank #}
             40lb Tank
           {% elif weight < 25 and weight > 10 %}{# If not empty and too low, must be small tank #}
