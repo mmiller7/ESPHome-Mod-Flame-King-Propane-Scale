@@ -1,15 +1,26 @@
-esphome:
-  name: fireplace_propane
-  platform: ESP8266
+substitutions:
+  devicename: fireplace_propane
+  sensor_power_pin: D6
+  status_led_pin: D5
+  temp_sensor_data_pin: D7
+  load_cell_analog_pin: A0
+
+esp8266:
   board: d1_mini
-    
+
+esphome:
+  name: ${devicename}
+
   on_boot:
     # priorities: https://esphome.io/api/namespaceesphome_1_1setup__priority.html#ae948d01216eb5ed6e959b44982109f5d 
-    - priority: 700
+    #
+    # Note - we have to do this twice because BUS is for some reason higher
+    # priority level than the hardware pin setup.
+    #
+    # This forces the pin for sensor power to be immediately set up and turned on.
+    - priority: 1001
       then:
-        # Turn on the pin which powers the sensors
-        - switch.turn_on: sensor_power
-
+        # Turn on the pin which powers the sensors and
         # Wait for the power bus to stabilize
         # NOTE: This is especially critical for
         # the Dallas Hub to properly detect sensors.
@@ -17,7 +28,15 @@ esphome:
         #   60mS - seems stable in some tests
         #   120mS - allows extra buffer to stabilize
         - lambda: |-
-            delay(150);
+            pinMode(${sensor_power_pin}, OUTPUT);
+            digitalWrite(${sensor_power_pin}, HIGH);
+            delay(1000);
+
+    # This sets the sensor power to be on again as soon as HARDWARE initializes GPIO
+    - priority: 799
+      then:
+        # Turn on the pin which powers the sensors
+        - switch.turn_on: sensor_power
 
   on_shutdown:
     - priority: 700
@@ -35,7 +54,7 @@ wifi:
 
   # Enable fallback hotspot (captive portal) in case wifi connection fails
   ap:
-    ssid: "fireplace_propane setup"
+    ssid: "${devicename} setup"
 
 captive_portal:
 
@@ -47,26 +66,27 @@ logger:
 api:
 
 ota:
+  - platform: esphome
 
 
 
 switch:
   # Power switch to load cell and temperature sensor circuitry
   - platform: gpio
-    pin: D6
+    pin: ${sensor_power_pin}
     id: sensor_power
     name: "Sensor Power"
     internal: true
 
   # Allow forced-reboot from HomeAssistant
   - platform: restart
-    name: "fireplace_propane Restart"
+    name: "${devicename} Restart"
 
   # Allow immediate-sleep from HomeAssistant
   # This will allow for more complex decisions
   # and longer delay to ensure sensor updates
   - platform: template
-    name: "fireplace_propane Deep Sleep Now"
+    name: "${devicename} Deep Sleep Now"
     icon: "mdi:sleep"
     turn_on_action:
       - deep_sleep.enter: do_sleep
@@ -75,9 +95,9 @@ switch:
 
 # To use your dallas sensor, first define a dallas “hub” with a pin
 # This is where the data-pin of the DS18B20 temp-sensor is connected
-dallas:
-  - pin: D7
-    update_interval: 15s
+one_wire:
+  - platform: gpio
+    pin: ${temp_sensor_data_pin}
 
 
 
@@ -85,9 +105,9 @@ sensor:
 
   # Load cell amp analog signal in scale
   - platform: adc
-    pin: A0
-    name: "fireplace_propane Weight Raw"
-    id: fireplace_propane_weight_raw
+    pin: ${load_cell_analog_pin}
+    name: "${devicename} Weight Raw"
+    id: ${devicename}_weight_raw
     unit_of_measurement: "lb"
     icon: "mdi:scale"
     device_class: "weight"
@@ -103,25 +123,31 @@ sensor:
           - 0.669922 -> 0.0
           # Large-Weight Calibration:
           - 0.834961 -> 68.2
+      # With USB power, we can do a longer average here to reduce noise
+      # Remove sliding average for battery power
+      - sliding_window_moving_average:
+          window_size: 20
+          send_every: 15
+      - lambda: return round(x);
     on_value:
       # Update the component that computes the temperature-compensated weight every time we get a new weight
-      - component.update: fireplace_propane_weight
+      - component.update: ${devicename}_weight
       - logger.log:
           format: "*CALIBRATE Weight ADC: adc_raw=%.6f / output=%.2f lb"
-          args: [ 'id(fireplace_propane_weight_raw).raw_state', 'id(fireplace_propane_weight_raw).state' ]
+          args: [ 'id(${devicename}_weight_raw).raw_state', 'id(${devicename}_weight_raw).state' ]
 
   # Temperature sensor
-  - platform: dallas
-    index: 0
-    id: fireplace_propane_temperature
-    name: "fireplace_propane Temperature"
+  - platform: dallas_temp
+    id: ${devicename}_temperature
+    name: "${devicename} Temperature"
     #internal: true
+    update_interval: 15s
 
   # Adjustment to compute weight correction based on current temperature
   - platform: copy
-    source_id: fireplace_propane_temperature
-    name: "fireplace_propane Temperature Weight Correction"
-    id: fireplace_propane_temperature_weight_correction
+    source_id: ${devicename}_temperature
+    name: "${devicename} Temperature Weight Correction"
+    id: ${devicename}_temperature_weight_correction
     unit_of_measurement: "lb"
     internal: true
     filters:
@@ -129,18 +155,19 @@ sensor:
             # Temp -> Error correction weight delta
             # Weight Calibration Temp -> 0
             - 21.9 -> 0.0
-            # Colder/Hotter Temp -> +/- correction computed using known weight
-            #- -1.61 -> 6.7
-            - 3.3 -> 7.7
+            # Colderer Temp -> +/- correction computed using known weight
+            - -1.61 -> 6.7
+            #- 3.3 -> 7.7
+      - lambda: return round(x);
     on_value:
       - logger.log:
           format: "*CALIBRATE Temp LB-Correction: temp_raw=%.2f / output=%.2f lb"
-          args: [ 'id(fireplace_propane_temperature_weight_correction).raw_state', 'id(fireplace_propane_temperature_weight_correction).state' ]
+          args: [ 'id(${devicename}_temperature_weight_correction).raw_state', 'id(${devicename}_temperature_weight_correction).state' ]
 
   # Final output sensor to return the temperature-compensated weight
   - platform: template
-    name: "fireplace_propane Weight"
-    id: fireplace_propane_weight
+    name: "${devicename} Weight"
+    id: ${devicename}_weight
     unit_of_measurement: "lb"
     icon: "mdi:scale"
     device_class: "weight"
@@ -150,17 +177,21 @@ sensor:
     update_interval: never
     force_update: true
     lambda: |-
-      return id(fireplace_propane_weight_raw).state + id(fireplace_propane_temperature_weight_correction).state;
+      return id(${devicename}_weight_raw).state + id(${devicename}_temperature_weight_correction).state;
 
 status_led:
   pin:
-    number: D5
-    inverted: true
+    number: ${status_led_pin}
+    # inverted=true for battery
+    # inverted=false for USB power
+    inverted: false
 
 # Deep sleep to save battery power
 # Default to longer wake interval in case of
 # connection issues and easier OTA update
 deep_sleep:
   id: do_sleep
-  run_duration: "00:05:00"
-  sleep_duration: "00:30:00"
+# Since it can now run on USB power, no need to limit run duration.
+# Putting to sleep can still be optional, will be handled by switch
+#  run_duration: "00:05:00"
+  sleep_duration: "00:59:30"
